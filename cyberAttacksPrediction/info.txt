@@ -1,0 +1,8 @@
+python 3.10  required 
+
+python -m venv .myvenv
+
+activate the pythn venv
+
+pip install -r requirements.txt
+

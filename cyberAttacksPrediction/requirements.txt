@@ -7,3 +7,5 @@ matplotlib
 seaborn
 keras
 tensorflow
+uvicorn
+fastapi
