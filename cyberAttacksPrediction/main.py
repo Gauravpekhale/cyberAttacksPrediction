@@ -1,5 +1,6 @@
 #importing libraries
 
+import joblib
 import numpy as np
 import pandas as pd
 from joblib import dump, load
@@ -14,14 +15,14 @@ import seaborn as sns
 from sklearn import svm
 import sys
 import keras
-from SequentialModel import SequentialModel
+from utilities import SequentialModel
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Embedding, Flatten
 from keras.layers import LSTM, SimpleRNN, GRU, Bidirectional, BatchNormalization,Convolution1D,MaxPooling1D, Reshape, GlobalAveragePooling1D
 from keras.utils import to_categorical
-from tensorflow.keras.utils import get_file, plot_model
+# from tensorflow.keras.utils import get_file, plot_model
+# from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import confusion_matrix
 
@@ -57,9 +58,9 @@ async def Train_CNN_Model():
     new_df_train['class'] = tmp
     y_train = new_df_train['class']
     combined_data_X = new_df_train.drop('class', axis=1)
-    kfold = StratifiedKFold(n_splits=2,shuffle=True,random_state=42)
-    kfold.get_n_splits(combined_data_X,y_train)
-    batch_size = 32
+    # kfold = StratifiedKFold(n_splits=2,shuffle=True,random_state=42)
+    # kfold.get_n_splits(combined_data_X,y_train)
+    # batch_size = 32
     model = Sequential()
     model.add(Convolution1D(64, kernel_size=122, activation="relu",input_shape=(122, 1)))
     model.add(MaxPooling1D(5,padding='same'))
@@ -69,13 +70,13 @@ async def Train_CNN_Model():
     model.add(Dense(5))
     model.add(Activation('softmax'))
     model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['accuracy'])
-    scoreList = []
-    for train_index, test_index in kfold.split(combined_data_X, y_train):
-        train_X, test_X = combined_data_X.iloc[train_index], combined_data_X.iloc[test_index]
-        train_y, test_y = y_train.iloc[train_index], y_train.iloc[test_index]
-        
-        print("train index:", train_index)
-        print("test index:", test_index)
+    for layer in model.layers:
+        print(layer.output_shape)
+
+    print(model.summary())
+    #for train_index, test_index in kfold.split(combined_data_X, y_train):
+    if model:
+        train_X, test_X, train_y, test_y = train_test_split(combined_data_X, y_train, test_size=0.2, random_state=42)
         
         x_columns_train = new_df_train.columns.drop('class')
         x_train_array = train_X[x_columns_train].values
@@ -88,14 +89,11 @@ async def Train_CNN_Model():
         pred = Model.predict(x_test_array)  # Perform predictions using the trained classifier
         
         score = metrics.accuracy_score(test_y, pred)  # Evaluate accuracy
-        scoreList.append(score)
-        #print("Validation score: {}".format(score))
+        joblib.dump(Model, 'CNNmodel.pkl')
 
-        confussion_matrix=confusion_matrix(y_eval, pred, labels=[0,1,2,3,4])
-
-
-
-    return {"message":"The Model is trained using K-fold count = 3","accuracyScore":scoreList.Max()}
+        confussion_matrix=confusion_matrix(test_y, pred, labels=[0,1,2,3,4])    
+        
+    return {"message":"The Model is trained ","accuracyScore":score}
 
 
 
