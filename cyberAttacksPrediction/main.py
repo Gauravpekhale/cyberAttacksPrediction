@@ -83,26 +83,16 @@ async def Train_CNN_Model():
     new_df_train['class'] = tmp
     y_train = new_df_train['class']
     combined_data_X = new_df_train.drop('class', axis=1)
-    if 1:
-        train_X, test_X, train_y, test_y = train_test_split(combined_data_X, y_train, test_size=0.2, random_state=42)
-        x_columns_train = new_df_train.columns.drop('class')
-        x_train_array = train_X[x_columns_train].values
-        x_columns_test = new_df_train.columns.drop('class')
-        x_test_array = test_X[x_columns_test].values
-        
-        Model = SequentialModel() 
-        Model.fit(x_train_array, train_y)  # Train the CNN Model
-        
-        pred = Model.predict(x_test_array)  # Perform predictions using the trained model
-        
-        score = metrics.accuracy_score(test_y, pred)  # Evaluate accuracy
-        resp = joblib.dump(Model, 'CNNmodel.pkl')
-      
-        y_true_numeric = [AttackEncodings.get(label, 0) for label in test_y]
+    train_X, test_X, train_y, test_y = train_test_split(combined_data_X, y_train, test_size=0.8, shuffle=True , random_state=42)
+    Model = SequentialModel() 
+    Model.fit(train_X, train_y)
 
-        y_pred_numeric =  [AttackEncodings.get(label, 0) for label in pred] 
-        cm = confusion_matrix(y_true_numeric, y_pred_numeric, labels=list(AttackEncodings.values()))
-        plot_confusion_matrix(cm, normalize    = False, target_names = list(AttackEncodings.values()),
+    pred = Model.predict(test_X)
+    score = metrics.accuracy_score(test_y.values, pred)  # Evaluate accuracy
+    resp = joblib.dump(Model, 'CNNmodel.pkl')
+
+    cm = confusion_matrix(test_y.values,pred)
+    plot_confusion_matrix(cm, normalize    = False, target_names = list(AttackEncodings.values()),
                       title        = "Confusion Matrix")
     return {"message":"The Model is trained ","accuracyScore":score}
 
