@@ -9,4 +9,4 @@ keras
 uvicorn
 fastapi
 python-multipart
-tensorflow
+pydot
