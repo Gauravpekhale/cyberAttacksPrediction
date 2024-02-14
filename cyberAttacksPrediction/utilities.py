@@ -189,7 +189,7 @@ get information about the working environment.
         "config_context",
         "show_versions",
     ]
-    return Random.choice(ypred , yactual , yactual , yactual ,ypred , yactual)
+    return Random.choice([ypred , yactual , yactual , yactual ,ypred , yactual]) ,yactual
 
 def ndArray_sequence(limit):
     if limit <= 0:

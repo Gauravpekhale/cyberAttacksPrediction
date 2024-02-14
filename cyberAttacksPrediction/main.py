@@ -15,12 +15,6 @@ import seaborn as sns
 from sklearn import svm
 import sys
 from utilities import  ConvertToLinearOutput, SequentialModel
-# from keras.models import Sequential
-# from keras.layers import Dense, Dropout, Activation, Embedding, Flatten
-# from keras.layers import LSTM, SimpleRNN, GRU, Bidirectional, BatchNormalization,Convolution1D,MaxPooling1D, Reshape, GlobalAveragePooling1D
-# from keras.utils import to_categorical
-# from tensorflow.keras.utils import get_file, plot_model
-# from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import confusion_matrix
@@ -57,7 +51,6 @@ testColumns = ['duration', 'protocol_type', 'service', 'flag', 'src_bytes',
 'dst_host_srv_serror_rate', 'dst_host_rerror_rate',
 'dst_host_srv_rerror_rate', 'subclass']
 
-GlobalModel = any
 @app.post("/Upload_DataSets")
 async def Upload_DataSets(trainingFile:UploadFile = File(...) , testingFile:UploadFile = File(...)):
     with open("train.csv","wb") as f:
@@ -104,8 +97,7 @@ async def Train_CNN_Model():
         
         score = metrics.accuracy_score(test_y, pred)  # Evaluate accuracy
         resp = joblib.dump(Model, 'CNNmodel.pkl')
-        global GlobalModel
-        GlobalModel = Model
+      
         y_true_numeric = [AttackEncodings.get(label, 0) for label in test_y]
 
         y_pred_numeric =  [AttackEncodings.get(label, 0) for label in pred] 
@@ -158,9 +150,9 @@ async def Test_CNN_Model(csvString :str):
         x_test_array = train_X[x_columns_test].values   
         
         pred = Model.predict(x_test_array)
-        pred = ConvertToLinearOutput(pred[0] ,train_y.values[0])
+        pred,train_y = ConvertToLinearOutput(pred[0] ,train_y.values[0]) # n- dimentinal nd-array is breaked down into Linear Output
 
-    return {"Predicted": pred[0], "Actual":train_y.values[0] }
+    return {"Predicted": pred, "Actual":train_y }
 
 if __name__ == "__main__":
     import uvicorn
