@@ -14,14 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn import svm
 import sys
-import keras
-from utilities import SequentialModel
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, Embedding, Flatten
-from keras.layers import LSTM, SimpleRNN, GRU, Bidirectional, BatchNormalization,Convolution1D,MaxPooling1D, Reshape, GlobalAveragePooling1D
-from keras.utils import to_categorical
-# from tensorflow.keras.utils import get_file, plot_model
-# from tensorflow.keras.callbacks import EarlyStopping
+from utilities import  ConvertToLinearOutput, SequentialModel
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import confusion_matrix
@@ -32,7 +25,31 @@ from fastapi import FastAPI, File, HTTPException, Body, UploadFile
 
 app = FastAPI()
 
+trainColumns = ['duration', 'protocol_type', 'service', 'flag', 'src_bytes',
+'dst_bytes', 'land', 'wrong_fragment', 'urgent', 'hot',
+'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell',
+'su_attempted', 'num_root', 'num_file_creations', 'num_shells',
+'num_access_files', 'num_outbound_cmds', 'is_host_login',
+'is_guest_login', 'count', 'srv_count', 'serror_rate',
+'srv_serror_rate', 'rerror_rate', 'srv_rerror_rate', 'same_srv_rate',
+'diff_srv_rate', 'srv_diff_host_rate', 'dst_host_count',
+'dst_host_srv_count', 'dst_host_same_srv_rate','dst_host_diff_srv_rate', 'dst_host_same_src_port_rate',
+'dst_host_srv_diff_host_rate', 'dst_host_serror_rate',
+'dst_host_srv_serror_rate', 'dst_host_rerror_rate',
+'dst_host_srv_rerror_rate', 'subclass']
 
+testColumns = ['duration', 'protocol_type', 'service', 'flag', 'src_bytes',
+'dst_bytes', 'land', 'wrong_fragment', 'urgent', 'hot',
+'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell',
+'su_attempted', 'num_root', 'num_file_creations', 'num_shells',
+'num_access_files', 'num_outbound_cmds', 'is_host_login',
+'is_guest_login', 'count', 'srv_count', 'serror_rate',
+'srv_serror_rate', 'rerror_rate', 'srv_rerror_rate', 'same_srv_rate',
+'diff_srv_rate', 'srv_diff_host_rate', 'dst_host_count',
+'dst_host_srv_count', 'dst_host_same_srv_rate','dst_host_diff_srv_rate', 'dst_host_same_src_port_rate',
+'dst_host_srv_diff_host_rate', 'dst_host_serror_rate',
+'dst_host_srv_serror_rate', 'dst_host_rerror_rate',
+'dst_host_srv_rerror_rate', 'subclass']
 
 @app.post("/Upload_DataSets")
 async def Upload_DataSets(trainingFile:UploadFile = File(...) , testingFile:UploadFile = File(...)):
@@ -40,67 +57,100 @@ async def Upload_DataSets(trainingFile:UploadFile = File(...) , testingFile:Uplo
         content = await trainingFile.read()
         f.write(content) 
     with open("test.csv","wb") as f:
-        content = await trainingFile.read()
+        content = await testingFile.read()
         f.write(content)
     return {'message' : "Files Uploaded Successfully"}
     
 
 @app.post("/Train_CNN_Model")
 async def Train_CNN_Model():
+    global trainColumns
+    global testColumns
+    global columns
+    global attack_type
+
     df_train = pd.read_csv('train.csv')
-    df_test = pd.read_csv('test.csv')
-    df_test.columns = testColumns
     df_train.columns = trainColumns
-    combined_data = pd.concat([df_train, df_test])
+    combined_data = pd.concat([df_train])
+    normal_records = combined_data[combined_data['subclass'] == 'normal'].sample(n=100, random_state=42)     # data samplingg
+
+    combined_data = combined_data[combined_data['subclass'] != 'normal']
+    combined_data = pd.concat([df_train,normal_records])
+
     combined_data = one_hot(combined_data,columns)
     tmp = combined_data.pop('subclass') 
     new_df_train = normalize(combined_data,combined_data.columns)
     new_df_train['class'] = tmp
     y_train = new_df_train['class']
     combined_data_X = new_df_train.drop('class', axis=1)
-    # kfold = StratifiedKFold(n_splits=2,shuffle=True,random_state=42)
-    # kfold.get_n_splits(combined_data_X,y_train)
-    # batch_size = 32
-    model = Sequential()
-    model.add(Convolution1D(64, kernel_size=122, activation="relu",input_shape=(122, 1)))
-    model.add(MaxPooling1D(5,padding='same'))
-    model.add(BatchNormalization())
-    model.add(Flatten())
-    model.add(Dropout(0.5))
-    model.add(Dense(5))
-    model.add(Activation('softmax'))
-    model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['accuracy'])
-    for layer in model.layers:
-        print(layer.output_shape)
-
-    print(model.summary())
-    #for train_index, test_index in kfold.split(combined_data_X, y_train):
-    if model:
+    if 1:
         train_X, test_X, train_y, test_y = train_test_split(combined_data_X, y_train, test_size=0.2, random_state=42)
-        
         x_columns_train = new_df_train.columns.drop('class')
         x_train_array = train_X[x_columns_train].values
         x_columns_test = new_df_train.columns.drop('class')
         x_test_array = test_X[x_columns_test].values
         
-        Model = SequentialModel()  # Refreshing model for each K-fold
-        Model.fit(x_train_array, train_y)  # Train the SVM classifier
+        Model = SequentialModel() 
+        Model.fit(x_train_array, train_y)  # Train the CNN Model
         
-        pred = Model.predict(x_test_array)  # Perform predictions using the trained classifier
+        pred = Model.predict(x_test_array)  # Perform predictions using the trained model
         
         score = metrics.accuracy_score(test_y, pred)  # Evaluate accuracy
-        joblib.dump(Model, 'CNNmodel.pkl')
+        resp = joblib.dump(Model, 'CNNmodel.pkl')
+      
+        y_true_numeric = [AttackEncodings.get(label, 0) for label in test_y]
 
-        confussion_matrix=confusion_matrix(test_y, pred, labels=[0,1,2,3,4])    
-        
+        y_pred_numeric =  [AttackEncodings.get(label, 0) for label in pred] 
+        cm = confusion_matrix(y_true_numeric, y_pred_numeric, labels=list(AttackEncodings.values()))
+        plot_confusion_matrix(cm, normalize    = False, target_names = list(AttackEncodings.values()),
+                      title        = "Confusion Matrix")
     return {"message":"The Model is trained ","accuracyScore":score}
 
 
+AttackEncodings = {'processtable': 1, 'land': 2, 'neptune': 3, 'satan': 4, 'warezmaster': 5, 'back': 6, 'buffer_overflow': 7, 'snmpgetattack': 8, 'warezclient': 9, 'teardrop': 10, 'mailbomb': 11, 'normal': 12, 'multihop': 13, 'ps': 14, 'httptunnel': 15, 'imap': 16, 'xsnoop': 17, 'rootkit': 18, 'loadmodule': 19, 'portsweep': 20, 'pod': 21, 'perl': 22, 'nmap': 23, 'guess_passwd': 24, 'spy': 25, 'ftp_write': 26, 'ipsweep': 27, 'snmpguess': 28, 'xlock': 29, 'smurf': 30, 'saint': 31, 'apache2': 32, 'mscan': 33}
 
+
+@app.post("/ParseCSVString")
+async def ParseCSVString(csvString :str):
+    data_dict = dict(zip(trainColumns, csvString.split(',')))
+    df = pd.DataFrame([data_dict])
+    return df
+
+@app.post("/Test_CNN_Model")
+async def Test_CNN_Model(csvString :str):
+    global trainColumns
+    global testColumns
+    global columns
+    df_test = await ParseCSVString(csvString)
+    print(df_test.shape)
+    df_train = pd.read_csv('train.csv')
+    df_train.columns = trainColumns
+    df_test.columns = trainColumns
+    print(df_train.head())
+    combined_data = pd.concat([df_test,df_train])
+    print(combined_data.head())
+
+    combined_data = one_hot(combined_data,columns)
+    tmp = combined_data.pop('subclass') 
+    new_df_train = combined_data #normalize(combined_data,combined_data.columns)
+    new_df_train['class'] = tmp
+    y_train = new_df_train['class']
+    combined_data_X = new_df_train.drop('class', axis=1)
+    ActualTestTrue = new_df_train['class']      # the actyual tru data 
+    Model = load('CNNmodel.pkl')
+
+    if Model:
+        train_X, test_X, train_y, test_y = train_test_split(combined_data_X, y_train, test_size=0.8, shuffle=False , random_state=None)
+        x_columns_test = new_df_train.columns.drop('class')
+        x_test_array = train_X[x_columns_test].values   
+        
+        pred = Model.predict(x_test_array)
+        pred,train_y = ConvertToLinearOutput(pred[0] ,train_y.values[0]) # n- dimentinal nd-array is breaked down into Linear Output
+
+    return {"Predicted": pred, "Actual":train_y }
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="localhost", port=8000)
 
 
@@ -130,35 +180,11 @@ def one_hot(df, cols):
     for each in cols:
         dummies = pd.get_dummies(df[each], prefix=each, drop_first=False)
         df = pd.concat([df, dummies], axis=1)
-        df = df.drop([each], axis=1)  # Corrected line
+        df = df.drop([each], axis=1)  
     return df
 columns = ['protocol_type','service','flag']
 
-trainColumns = ['duration', 'protocol_type', 'service', 'flag', 'src_bytes',
-'dst_bytes', 'land', 'wrong_fragment', 'urgent', 'hot',
-'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell',
-'su_attempted', 'num_root', 'num_file_creations', 'num_shells',
-'num_access_files', 'num_outbound_cmds', 'is_host_login',
-'is_guest_login', 'count', 'srv_count', 'serror_rate',
-'srv_serror_rate', 'rerror_rate', 'srv_rerror_rate', 'same_srv_rate',
-'diff_srv_rate', 'srv_diff_host_rate', 'dst_host_count',
-'dst_host_srv_count', 'dst_host_same_srv_rate','dst_host_diff_srv_rate', 'dst_host_same_src_port_rate',
-'dst_host_srv_diff_host_rate', 'dst_host_serror_rate',
-'dst_host_srv_serror_rate', 'dst_host_rerror_rate',
-'dst_host_srv_rerror_rate', 'subclass']
 
-testColumns = ['duration', 'protocol_type', 'service', 'flag', 'src_bytes',
-'dst_bytes', 'land', 'wrong_fragment', 'urgent', 'hot',
-'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell',
-'su_attempted', 'num_root', 'num_file_creations', 'num_shells',
-'num_access_files', 'num_outbound_cmds', 'is_host_login',
-'is_guest_login', 'count', 'srv_count', 'serror_rate',
-'srv_serror_rate', 'rerror_rate', 'srv_rerror_rate', 'same_srv_rate',
-'diff_srv_rate', 'srv_diff_host_rate', 'dst_host_count',
-'dst_host_srv_count', 'dst_host_same_srv_rate','dst_host_diff_srv_rate', 'dst_host_same_src_port_rate',
-'dst_host_srv_diff_host_rate', 'dst_host_serror_rate',
-'dst_host_srv_serror_rate', 'dst_host_rerror_rate',
-'dst_host_srv_rerror_rate', 'subclass']
 
 confusionMatrixPath = "analytics/confusionMatrix.png"
 
@@ -211,4 +237,3 @@ def plot_confusion_matrix(cm,
     plt.ylabel('True label')
     plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
     plt.savefig(confusionMatrixPath)
-    plt.show()
