@@ -6,6 +6,6 @@ scipy
 matplotlib
 seaborn
 keras
-tensorflow
 uvicorn
 fastapi
+python-multipart
