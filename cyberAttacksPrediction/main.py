@@ -1,5 +1,6 @@
 #importing libraries
 
+from fastapi.responses import StreamingResponse
 import joblib
 import numpy as np
 import pandas as pd
@@ -14,6 +15,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn import svm
 import sys
+import os
 from utilities import  ConvertToLinearOutput, SequentialModel
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
@@ -99,6 +101,16 @@ async def Train_CNN_Model():
 
 AttackEncodings = {'processtable': 1, 'land': 2, 'neptune': 3, 'satan': 4, 'warezmaster': 5, 'back': 6, 'buffer_overflow': 7, 'snmpgetattack': 8, 'warezclient': 9, 'teardrop': 10, 'mailbomb': 11, 'normal': 12, 'multihop': 13, 'ps': 14, 'httptunnel': 15, 'imap': 16, 'xsnoop': 17, 'rootkit': 18, 'loadmodule': 19, 'portsweep': 20, 'pod': 21, 'perl': 22, 'nmap': 23, 'guess_passwd': 24, 'spy': 25, 'ftp_write': 26, 'ipsweep': 27, 'snmpguess': 28, 'xlock': 29, 'smurf': 30, 'saint': 31, 'apache2': 32, 'mscan': 33}
 
+@app.get("/download-model")
+async def download_model():
+    model_path = "CNNmodel.pkl"
+    
+    # Check if the file exists
+    if not os.path.exists(model_path):
+        raise HTTPException(status_code=404, detail="Model file not found")
+    
+    # Use StreamingResponse to efficiently serve the file
+    return StreamingResponse(open(model_path, "rb"), media_type="application/octet-stream", headers={"Content-Disposition": f"attachment;filename={model_path}"})
 
 @app.post("/ParseCSVString")
 async def ParseCSVString(csvString :str):
